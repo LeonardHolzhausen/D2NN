@@ -295,12 +295,10 @@ duplicate-free test means anything.
 
 ## Appendix: reproducing the numbers
 
-| Result | Script |
-|---|---|
-| 4.3 and 4.4, unbalanced view | `experiments/benchmark_baselines.py` |
-| 4.4, balanced | `experiments/benchmark_balanced.py` |
-| 4.5 | `experiments/pilot_supersampled.py` |
-| CNN rows in 4.4 and 4.5 | `experiments/pilot_cnn_reference.py` |
-
-All scripts use fixed seeds and the shape generator in `dataset.py` with
-`min_size = image_size // 8`.
+All numbers in section 4 come from fixed-seed runs of the shape
+generator in `dataset.py` (`min_size = image_size // 8`) together with
+standard scikit-learn / TensorFlow models (ridge, degree-2 kernel SVM,
+small fully connected network, CNN), following the deduplication and
+class-balancing procedure described in section 3.3. The individual
+benchmark scripts are being cleaned up and will be added to this
+repository shortly.

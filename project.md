@@ -53,7 +53,9 @@ These should be fixed in writing before any physical measurement:
 
 Stages 1 to 4 (dataset, reference models, working simulation, trained
 network in simulation, plus the analysis of what this kind of optics can
-and cannot do) are a complete result on their own.
+and cannot do) are a complete result on their own. (See section 13 for
+the full stage-by-stage breakdown and what has to pass before each stage
+counts as done.)
 
 Stages 5 to 7 (fabrication, bench, measurement) are the open-ended part.
 If they take much longer than planned, the first block still stands.
