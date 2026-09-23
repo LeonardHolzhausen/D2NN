@@ -57,7 +57,6 @@ are in [`report.md`](report.md).
 | `dataset.py` | Synthetic shape dataset generator (circle / square / triangle / plus) |
 | `DNN.py` | Reference CNN benchmark on the dataset (dedup + class balancing, then train/test) |
 | `visualization.py` | Plotting helpers for dataset samples |
-| `old/` | Superseded material from an earlier project direction (mmWave radar / 3D-printed terahertz optics), kept for history only — not part of the current 532 nm / photolithography approach |
 
 ## Running it
 
