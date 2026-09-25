@@ -7,7 +7,7 @@ SHAPE_NAMES = ["circle", "square", "triangle", "plus"]
 
 
 class Dataset:
-    def __init__(self, dataset_size, image_size=128, seed=None):
+    def __init__(self, dataset_size, image_size=16, seed=None):
         self.dataset_size = dataset_size
         self.image_size = image_size
         self.dataset = []
