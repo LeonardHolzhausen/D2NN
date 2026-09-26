@@ -1,6 +1,8 @@
 import numpy as np
 import cmath
+
 import tensorflow as tf
+from sklearn.model_selection import train_test_split
 
 import dataset
 
@@ -138,26 +140,92 @@ class DiffractiveSimulationLayer:
 
         return tf.abs(field) ** 2
 
-# Get the dataset training data
-image_size=16
-data = dataset.Dataset(4000, image_size=16, seed=42)
-X = np.array([s["image"] for s in data.dataset], dtype="float32")
-y = np.array([s["label"] for s in data.dataset])    # integer labels 0-3
+def forward(layers, image):
+    field = layers[0].B1(image)
+    for layer in layers:
+        field = layer.B2(field)
+        field = layer.B3(field)
+    brightness = layers[-1].B4(field)
+    region_sums = read_output_regions(brightness)
+    return region_sums / (tf.reduce_sum(region_sums) + 1e-8)
 
-# Simulation forward pass logic (only logic so far!)
-simulation = DiffractiveSimulationLayer(image_size)
-starting_pattern = simulation.B1(image)
+def train_step(layers, image, label, optimizer, temperature=20.0):
+    with tf.GradientTape() as tape:
+        probs = tf.nn.softmax(forward(layers, image) * temperature)
+        loss = tf.keras.losses.sparse_categorical_crossentropy(
+            tf.constant([label]), tf.expand_dims(probs, 0)
+        )[0]
+    trainable_vars = [layer.delays for layer in layers]
+    grads = tape.gradient(loss, trainable_vars)
+    optimizer.apply_gradients(zip(grads, trainable_vars))
+    return loss
 
-layer1_sim = DiffractiveSimulationLayer(image_size)
-layer1 = layer1_sim.B2(starting_pattern)
-propagated_layer = layer1_sim.B3(layer1)
+def read_output_regions(brightness_image, center=128, half=10, gap=4):
+    offsets = [(-1, -1), (-1, 1), (1, -1), (1, 1)]  # 2x2 arrangement, close together
+    sums = []
+    for dr, dc in offsets:
+        r0 = center + dr * (half + gap) - half
+        c0 = center + dc * (half + gap) - half
+        sums.append(tf.reduce_sum(brightness_image[r0:r0+2*half, c0:c0+2*half]))
+    return tf.stack(sums)
 
-layer2_sim = DiffractiveSimulationLayer(image_size)
-layer2 = layer2_sim.B2(propagated_layer)
-propagated_layer = layer2_sim.B3(layer2)
+def train(epochs, X_train, y_train, layers=4, optimizer=tf.keras.optimizers.Adam(learning_rate=0.05)):
 
-layer3_sim = DiffractiveSimulationLayer(image_size)
-layer3 = layer3_sim.B2(propagated_layer)
-propagated_layer = layer3_sim.B3(layer3)
+    for epoch in range(epochs):
+        epoch_loss = 0
 
-output = simulation.B4(layer3)
+        for image, label in zip(X_train, y_train):
+            loss = train_step(layers, image, label, optimizer)
+            epoch_loss += float(loss)
+
+        print(epoch, epoch_loss / len(X_train))
+    
+def evaluate(X_test, y_test, layers=4):
+
+    accuracy = 0
+    total_loss = 0
+
+    for image, label in zip(X_test, y_test):
+        probs = forward(layers, image)
+        predicted = int(tf.argmax(probs).numpy())
+        accuracy += int(predicted == label)
+        total_loss += float(tf.keras.losses.sparse_categorical_crossentropy(
+            tf.constant([label]), tf.expand_dims(probs, 0)
+        )[0])
+
+    val_accuracy = accuracy / len(X_test)
+    val_loss = total_loss / len(X_test)
+
+    return val_accuracy, val_loss
+
+if __name__ == "__main__":
+
+    # Get the dataset training data
+    image_size=16
+    data = dataset.Dataset(4000, image_size=16, seed=42)
+    X = np.array([s["image"] for s in data.dataset], dtype="float32")
+    y = np.array([s["label"] for s in data.dataset])    # integer labels 0-3
+
+    # Remove duplicates BEFORE splitting
+    _, unique_idx = np.unique(X.reshape(len(X), -1), axis=0, return_index=True)
+    X, y = X[unique_idx], y[unique_idx]
+    
+    # Balance the classes
+    counts = np.bincount(y)
+    k = counts.min()
+    rng = np.random.default_rng(0)
+    keep = np.concatenate([rng.choice(np.where(y == c)[0], k, replace=False)
+                        for c in range(4)])
+    X, y = X[keep], y[keep]
+    print(f"{len(X)} images after dedup + balancing ({k} per class)")
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    numbers_of_layers = 3
+    layers = [DiffractiveSimulationLayer(image_size) for _ in range(numbers_of_layers)]
+
+    train(30, X_train, y_train, layers)
+    accuracy, avg_loss = evaluate(X_test, y_test, layers)
+    print(f'test accuracy: {accuracy:.3f}   test loss: {avg_loss:.4f}')
