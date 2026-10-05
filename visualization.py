@@ -1,4 +1,6 @@
 import dataset
+import globals
+
 from matplotlib import pyplot as plt
 
 
@@ -54,6 +56,6 @@ def show_sample_grid(samples, rows=2, cols=4):
 
 
 if __name__ == "__main__":
-    data = dataset.Dataset(8, image_size=16, seed=0).dataset
+    data = dataset.Dataset(8, image_size=globals.IMAGE_SIZE, seed=0).dataset
 
     show_sample_grid(data)

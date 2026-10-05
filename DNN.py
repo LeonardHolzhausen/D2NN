@@ -5,9 +5,10 @@ from keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dense
 from sklearn.model_selection import train_test_split
 
 import dataset
+import globals
 
 # --- Data ---
-d = dataset.Dataset(4000, image_size=16, seed=42)
+d = dataset.Dataset(4000, image_size=globals.IMAGE_SIZE, seed=42)
 X = np.array([s["image"] for s in d.dataset], dtype="float32")
 X = X.reshape(-1, 16, 16, 1)                     # add the channel dimension Conv2D expects
 y = np.array([s["label"] for s in d.dataset])    # integer labels 0-3
@@ -25,14 +26,14 @@ keep = np.concatenate([rng.choice(np.where(y == c)[0], k, replace=False)
 X, y = X[keep], y[keep]
 print(f"{len(X)} images after dedup + balancing ({k} per class)")
  
-X = X.reshape(-1, 16, 16, 1)                     # add the channel dimension Conv2D expects
+X = X.reshape(-1, globals.IMAGE_SIZE, globals.IMAGE_SIZE, 1)                     # add the channel dimension Conv2D expects
 
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
 # --- Model ---
-inputs = Input(shape=(16, 16, 1))
+inputs = Input(shape=(globals.IMAGE_SIZE, globals.IMAGE_SIZE, 1))
 
 x = Conv2D(16, 3, activation="relu", padding="same")(inputs)
 x = Conv2D(16, 3, activation="relu", padding="same")(x)

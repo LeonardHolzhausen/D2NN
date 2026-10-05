@@ -5,6 +5,7 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
 import dataset
+import globals
 
 
 class DiffractiveSimulationLayer:
@@ -13,6 +14,7 @@ class DiffractiveSimulationLayer:
 
         self.N = image_size
         self.refine_size = refine_size
+        self.pad_size = refine_size // 2
 
         self.wave_length = 532E-9 #Green laser light
         self.p = 150E-6 #pitch
@@ -28,7 +30,7 @@ class DiffractiveSimulationLayer:
             )
         )
 
-        self.H = tf.constant(self.simulation_setup(), dtype=tf.complex64)
+        self.H = tf.constant(self.simulation_setup(), dtype=tf.complex64) #Needs to be cached before actual training (after all tests (D2NN_tests.py) return positive).
 
     def simulation_setup(self):
 
@@ -62,7 +64,7 @@ class DiffractiveSimulationLayer:
         if complex == False:
 
             empty_grid = np.zeros(
-                    (2*self.refine_size, 2*self.refine_size),
+                    (self.pad_size * 4, self.pad_size * 4),
                     dtype=np.float64
                     )
 
@@ -79,14 +81,14 @@ class DiffractiveSimulationLayer:
         return tf.pad(
             image,
             paddings=[ # Padding of half the refined image width, doubling the image size (128x128 -> 256x256)
-                [self.refine_size // 2, self.refine_size // 2],
-                [self.refine_size // 2, self.refine_size // 2]
+                [self.pad_size, self.pad_size],
+                [self.pad_size, self.pad_size]
             ]
         )
 
     def get_fft_frequencies(self):
 
-        n = self.refine_size * 2
+        n = self.pad_size * 4
         d = self.p / (self.refine_size // self.N)
         freq = np.fft.fftfreq(n, d=d)
         fx, fy = np.meshgrid(freq, freq)
@@ -111,7 +113,7 @@ class DiffractiveSimulationLayer:
 
         return H_array
 
-    def B1(self, image): #refine size must be the same as in the previous functions
+    def B1(self, image):
 
         light_field = self.refine_image(image, complex=True)
         patted_light_field = self.pad_image(light_field, complex=True)
@@ -141,6 +143,7 @@ class DiffractiveSimulationLayer:
         return tf.abs(field) ** 2
 
 def forward(layers, image):
+    
     field = layers[0].B1(image)
     for layer in layers:
         field = layer.B2(field)
@@ -150,6 +153,7 @@ def forward(layers, image):
     return region_sums / (tf.reduce_sum(region_sums) + 1e-8)
 
 def train_step(layers, image, label, optimizer, temperature=20.0):
+
     with tf.GradientTape() as tape:
         probs = tf.nn.softmax(forward(layers, image) * temperature)
         loss = tf.keras.losses.sparse_categorical_crossentropy(
@@ -161,6 +165,7 @@ def train_step(layers, image, label, optimizer, temperature=20.0):
     return loss
 
 def read_output_regions(brightness_image, center=128, half=10, gap=4):
+
     offsets = [(-1, -1), (-1, 1), (1, -1), (1, 1)]  # 2x2 arrangement, close together
     sums = []
     for dr, dc in offsets:
@@ -201,8 +206,7 @@ def evaluate(X_test, y_test, layers=4):
 if __name__ == "__main__":
 
     # Get the dataset training data
-    image_size=16
-    data = dataset.Dataset(4000, image_size=16, seed=42)
+    data = dataset.Dataset(4000, image_size=globals.IMAGE_SIZE, seed=42)
     X = np.array([s["image"] for s in data.dataset], dtype="float32")
     y = np.array([s["label"] for s in data.dataset])    # integer labels 0-3
 
@@ -224,7 +228,7 @@ if __name__ == "__main__":
     )
 
     numbers_of_layers = 3
-    layers = [DiffractiveSimulationLayer(image_size) for _ in range(numbers_of_layers)]
+    layers = [DiffractiveSimulationLayer(globals.IMAGE_SIZE) for _ in range(numbers_of_layers)]
 
     train(30, X_train, y_train, layers)
     accuracy, avg_loss = evaluate(X_test, y_test, layers)

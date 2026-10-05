@@ -16,3 +16,7 @@ Thumbs.db
 *.npz
 .git_old_broken/
 old/
+
+# markdown files
+resume_skills.md 
+project_state.md
